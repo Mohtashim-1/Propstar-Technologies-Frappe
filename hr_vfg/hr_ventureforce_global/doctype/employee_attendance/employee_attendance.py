@@ -1027,6 +1027,9 @@ class EmployeeAttendance(Document):
                                 print(f"Error parsing time: {e}")
                         
                         # frappe.log_error(f"Check-out time: {check_out_1_time}, Shift out time: {shift_out_time}, Time difference: {time_difference_delta}")
+
+                        if isinstance(check_out_1_time, datetime):
+                            check_out_1_time = check_out_1_time.time()
                         
                         if over_time_slab_doc:
                             for record in over_time_slab_doc:
@@ -1042,24 +1045,20 @@ class EmployeeAttendance(Document):
                                     record.to_time = (datetime.min + record.to_time).time()
                             
                                 if check_out_1_time is not None:
+                                    # check_out_1_time_only = check_out_1_time.time()
                                     if record.type == data.day_type:
+                                        
 
                                             if record.from_time > record.to_time:
                                                 # Shift crosses midnight
-                                                # data.estimated_late = "difference_str2"
+                                                check_out_1_time = check_out_1_time.time()
                                                 if check_out_1_time >= record.from_time or check_out_1_time <= record.to_time:
                                                     if isinstance(threshould, timedelta):
-                                                        # If threshould is a timedelta, use its total seconds to create a new timedelta
-                                                        threshold_timedelta = threshould  # Directly use threshould since it's already a timedelta
+                                                        threshold_timedelta = threshould
                                                     else:
-                                                        # Otherwise, assume threshould should be a numeric value
                                                         threshold_timedelta = timedelta(hours=float(threshould))
 
                                                     data.estimated_late = "difference_str1"
-                                                    threshold_timedelta = timedelta(hours=threshould)
-                                                    # data.estimated_late = "difference_str1"
-                                                    
-                                                    # Assuming a condition to proceed
                                                     if time_difference_delta >= threshold_timedelta:
                                                         data.late_threshold = threshould
                                                         data.data = record.otc_name
@@ -1114,10 +1113,15 @@ class EmployeeAttendance(Document):
                                             # elif check_out_1_time > record.from_time:
                                             #         data.estimated_late = "str1"
                                             else:
+                                                if isinstance(check_out_1_time, datetime):
+                                                    check_out_1_time = check_out_1_time.time()
+                                                # check_out_1_time = check_out_1_time.time()
                                                 # Handle the case where the shift does not cross midnight
                                                 if check_out_1_time >= record.from_time and check_out_1_time <= record.to_time:
                                                     if threshould is None:
                                                         threshould = 0
+                                                    else:
+                                                        threshold_timedelta = timedelta(hours=float(threshould))
 
 
 
@@ -1560,18 +1564,36 @@ class EmployeeAttendance(Document):
                             
                                 if data.check_in_1:
                                     if record_1.from_time < record_1.to_time:
+                                        if isinstance(check_in_1_time, datetime):
+                                            check_in_1_time = check_in_1_time.time()  # Convert to time
                                         # Shift crosses midnight
                                         if check_in_1_time < record_1.to_time:
-                                            if threshould is not None and time_difference_delta1 > threshould:
-                                                time_difference_multiplied = time_difference_delta1 * record_1.per_hour_calculation
-                                                time_difference_result = time_difference_multiplied.total_seconds()
-                                                final_timedelta = timedelta(seconds=time_difference_result)
-                                                time_delta_difference = int(final_timedelta.total_seconds())
-                                                hours = time_delta_difference // 3600
-                                                minutes = (time_delta_difference % 3600) // 60
-                                                seconds = time_delta_difference % 60
-                                                difference_str1 = f"{hours}:{minutes}:{seconds}"
-                                                data.estimate_early = final_timedelta
+                                            if threshould is not None:
+                                                # Convert threshould from float (hours) to timedelta
+                                                if isinstance(threshould, float):
+                                                    threshold_timedelta = timedelta(hours=threshould)
+                                                elif isinstance(threshould, timedelta):
+                                                    threshold_timedelta = threshould
+                                                # else:
+                                                #     raise ValueError("threshould must be a float or a timedelta")
+
+                                                
+                                                if time_difference_delta1 > threshold_timedelta:
+                                                    time_difference_multiplied = time_difference_delta1 * record_1.per_hour_calculation
+                                                    time_difference_result = time_difference_multiplied.total_seconds()
+
+                                                    final_timedelta = timedelta(seconds=time_difference_result)
+                                                    time_delta_difference = int(final_timedelta.total_seconds())
+                                                    hours = time_delta_difference // 3600
+                                                    minutes = (time_delta_difference % 3600) // 60
+                                                    seconds = time_delta_difference % 60
+                                                    difference_str1 = f"{hours}:{minutes}:{seconds}"
+
+                                                    # Store the estimated early time in your data object
+                                                    data.estimate_early = final_timedelta
+
+                                                    # You can also log the difference if needed
+                                                    print(f"Estimated Early Time: {difference_str1}")
                                         else:
                                             if data.over_time_type == "Weekly Off":
                                                 if time_difference_delta1 > threshould:
